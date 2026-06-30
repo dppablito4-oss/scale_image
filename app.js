@@ -399,83 +399,77 @@ document.getElementById('btn-generate-pdf').addEventListener('click', async () =
   btn.innerHTML = 'Compilando PDF...';
   
   try {
-    const MM_TO_PT = 2.83464567;
-    const CANVAS_H_PT = 1189 * MM_TO_PT; // 3370.4 pt
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+      throw new Error('La librería jsPDF no está disponible en la página.');
+    }
     
-    // Crear PDF en blanco tamaño A0
-    const pdfDoc = await PDFLib.PDFDocument.create();
-    const page = pdfDoc.addPage([841 * MM_TO_PT, CANVAS_H_PT]);
+    // Crear PDF tamaño A0 (841 x 1189 mm)
+    // El constructor recibe: orientación ('p'), unidad ('mm'), formato ([841, 1189])
+    const pdf = new jsPDF('p', 'mm', [841, 1189]);
     
-    // Obtener los bytes de la imagen activa
-    const response = await fetch(activeImage.localUrl);
-    const imageBytes = await response.arrayBuffer();
+    const imageObj = new Image();
+    imageObj.src = activeImage.localUrl;
     
-    // Incrustar la imagen según el formato
-    const isPng = activeImage.name.toLowerCase().endsWith('.png');
-    const embeddedImg = isPng 
-      ? await pdfDoc.embedPng(imageBytes) 
-      : await pdfDoc.embedJpg(imageBytes);
-      
-    // Dibujar cada elemento de imposición
-    for (const item of items) {
+    await new Promise((resolve, reject) => {
+      imageObj.onload = resolve;
+      imageObj.onerror = reject;
+    });
+    
+    const scale = 5.0; // Píxeles por mm (127 DPI) para alta calidad de renderizado
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       const format = item.getAttr('currentFormat');
       const slot = spiralSlots.find(s => s.format === format);
       if (!slot) continue;
       
-      const wPt = slot.w * MM_TO_PT;
-      const hPt = slot.h * MM_TO_PT;
-      const xPt = slot.x * MM_TO_PT;
+      let x_visual, y_visual, w_visual, h_visual;
+      const tempCanvas = document.createElement('canvas');
       
-      // Inversión del eje Y (Web arriba-izquierda a PDF abajo-izquierda)
-      const yPt = CANVAS_H_PT - (slot.y * MM_TO_PT) - hPt;
-      
-      let drawX = xPt;
-      let drawY = yPt;
-      const rotationAngle = slot.rotation;
-      
-      // Aplicar el pivote correcto según el ángulo de rotación
-      if (rotationAngle === 90) {
-        drawX = xPt - hPt;
-        drawY = yPt + hPt;
-      } else if (rotationAngle === 180) {
-        drawX = xPt;
-        drawY = yPt + 2 * hPt;
-      } else if (rotationAngle === 270) {
-        drawX = xPt + hPt;
-        drawY = yPt + hPt;
+      if (slot.rotation === 90) {
+        w_visual = slot.h;
+        h_visual = slot.w;
+        x_visual = slot.x - slot.h;
+        y_visual = slot.y;
+      } else {
+        w_visual = slot.w;
+        h_visual = slot.h;
+        x_visual = slot.x;
+        y_visual = slot.y;
       }
       
-      // Estampar la imagen en el PDF
-      page.drawImage(embeddedImg, {
-        x: drawX,
-        y: drawY,
-        width: wPt,
-        height: hPt,
-        rotate: PDFLib.degrees(-rotationAngle)
-      });
+      tempCanvas.width = w_visual * scale;
+      tempCanvas.height = h_visual * scale;
       
-      // Dibujar un borde delgado gris alrededor de la imagen (guía de corte)
-      page.drawRectangle({
-        x: drawX,
-        y: drawY,
-        width: wPt,
-        height: hPt,
-        borderColor: PDFLib.rgb(0.7, 0.7, 0.7), // Gris claro
-        borderWidth: 0.5,
-        rotate: PDFLib.degrees(-rotationAngle)
-      });
+      const ctx = tempCanvas.getContext('2d');
+      ctx.save();
+      
+      // Si la imagen está rotada 90°, aplicar traslación y rotación al contexto
+      if (slot.rotation === 90) {
+        ctx.translate(tempCanvas.width, 0);
+        ctx.rotate(90 * Math.PI / 180);
+        ctx.drawImage(imageObj, 0, 0, tempCanvas.height, tempCanvas.width);
+      } else {
+        ctx.drawImage(imageObj, 0, 0, tempCanvas.width, tempCanvas.height);
+      }
+      
+      ctx.restore();
+      
+      // Dibujar borde guía de corte gris sobre el lienzo plano final
+      ctx.strokeStyle = '#b5b5b5';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(0, 0, tempCanvas.width, tempCanvas.height);
+      
+      // Convertir el lienzo a una URL de datos PNG
+      const dataUrl = tempCanvas.toDataURL('image/png');
+      
+      // Agregar al PDF en su posición y tamaño plano
+      pdf.addImage(dataUrl, 'PNG', x_visual, y_visual, w_visual, h_visual, undefined, 'FAST');
     }
     
-    // Guardar e iniciar descarga
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `impresion_A0_${Date.now()}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // Descargar el archivo PDF generado
+    pdf.save(`impresion_A0_${Date.now()}.pdf`);
     
     showToast('¡PDF de Imposición generado con éxito localmente!');
   } catch (err) {
