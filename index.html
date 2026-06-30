@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scale Image A0 - A10 | Imposición de Impresión</title>
+  <link rel="stylesheet" href="index.css">
+  <!-- Cargar Konva.js -->
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Barra Lateral -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">S</div>
+        <h1 class="brand-title">ScaleImage</h1>
+      </div>
+
+      <!-- Configuración de Supabase -->
+      <div>
+        <h2 class="section-title">Conexión Supabase</h2>
+        <div class="config-group">
+          <div class="input-field">
+            <label for="supabase-url">Supabase URL</label>
+            <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co" value="https://koptglmifwpzrfzvipnm.supabase.co">
+          </div>
+          <div class="input-field">
+            <label for="supabase-key">Anon Key</label>
+            <input type="password" id="supabase-key" placeholder="eyJhbGciOi..." value="sb_publishable_erAiat0Q6VFXk5gveRnj4A_3WKFzBzI">
+          </div>
+          <div class="input-field">
+            <label for="supabase-bucket">Storage Bucket</label>
+            <input type="text" id="supabase-bucket" value="imagenes-impresion">
+          </div>
+          <div class="input-field">
+            <label for="edge-function-url">Edge Function URL</label>
+            <input type="text" id="edge-function-url" placeholder="https://xxxx.supabase.co/functions/v1/scale-image" value="https://koptglmifwpzrfzvipnm.supabase.co/functions/v1/scale-image">
+          </div>
+        </div>
+      </div>
+
+      <!-- Cargar Imágenes -->
+      <div>
+        <h2 class="section-title">Subir Imágenes (PNG / JPG)</h2>
+        <div class="upload-zone" id="drop-zone">
+          <div class="upload-icon">✦</div>
+          <div class="upload-text">Arrastra imágenes aquí</div>
+          <div class="upload-subtext">o haz clic para seleccionar</div>
+          <input type="file" id="file-input" accept="image/png, image/jpeg, image/jpg" multiple style="display: none;">
+        </div>
+      </div>
+
+      <!-- Lista de Imágenes Cargadas en Storage -->
+      <div>
+        <h2 class="section-title">Galería de Archivos</h2>
+        <div class="image-list" id="image-list-container">
+          <!-- Las imágenes cargadas se mostrarán aquí -->
+        </div>
+      </div>
+
+      <!-- Detalles del Elemento Seleccionado en Canvas -->
+      <div class="selected-details" id="details-panel" style="display: none;">
+        <h2 class="section-title">Elemento Seleccionado</h2>
+        <div class="dimension-badge-grid">
+          <div class="dimension-badge">
+            <span class="dimension-label">Ancho</span>
+            <span class="dimension-value" id="detail-width">0 mm</span>
+          </div>
+          <div class="dimension-badge">
+            <span class="dimension-label">Alto</span>
+            <span class="dimension-value" id="detail-height">0 mm</span>
+          </div>
+          <div class="dimension-badge">
+            <span class="dimension-label">Posición X</span>
+            <span class="dimension-value" id="detail-x">0 mm</span>
+          </div>
+          <div class="dimension-badge">
+            <span class="dimension-label">Posición Y</span>
+            <span class="dimension-value" id="detail-y">0 mm</span>
+          </div>
+          <div class="dimension-badge" style="grid-column: span 2;">
+            <span class="dimension-label">Rotación</span>
+            <span class="dimension-value" id="detail-rotation">0°</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+          <button class="btn-secondary" id="btn-rotate-item" style="flex: 1;">Rotar 90°</button>
+          <button class="btn-secondary" id="btn-delete-item" style="flex: 1; border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">Eliminar</button>
+        </div>
+      </div>
+
+      <!-- Generación -->
+      <div style="margin-top: auto; padding-top: 1rem;">
+        <button class="btn-primary" id="btn-generate-pdf" disabled>
+          <span>Compilar PDF de Impresión</span>
+          <span style="font-size: 1.1em;">➔</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Área del Canvas -->
+    <main class="canvas-wrapper">
+      <div class="canvas-toolbar">
+        <h3 class="canvas-title">Lienzo A0 (841 x 1189 mm)</h3>
+        <div class="canvas-actions">
+          <span class="toolbar-info" id="canvas-status">Lienzo vacío</span>
+          <button class="btn-secondary" id="btn-clear-canvas" style="padding: 0.5rem 1rem;">Limpiar Todo</button>
+        </div>
+      </div>
+
+      <div class="canvas-viewport">
+        <!-- Contenedor del lienzo de Konva -->
+        <div id="konva-container"></div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Notificaciones Toast -->
+  <div class="toast" id="toast-notification">
+    <span class="toast-icon">✦</span>
+    <span class="toast-message" id="toast-message-text">Notificación</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
