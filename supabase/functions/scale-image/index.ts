@@ -85,19 +85,21 @@ Deno.serve(async (req) => {
       // Coordenadas base de dibujo final
       let drawX = xPt
       let drawY = yPt
-      const rotationAngle = item.rotation_deg || 0
+      
+      // Normalizar rotación de forma segura
+      const rotationAngle = ((item.rotation_deg || 0) % 360 + 360) % 360
 
       // 4. Adaptación matemática de rotación (Giro horario en web -> Giro antihorario en pdf-lib)
-      // Ajuste de los puntos de anclaje de rotación (Konva.js rota respecto a esquina superior izquierda)
+      // Ajuste de los puntos de anclaje de rotación (Konva.js rota respecto a esquina superior izquierda, pdf-lib respecto a inferior izquierda)
       if (rotationAngle === 90) {
-        drawX = xPt
+        drawX = xPt - hPt
         drawY = yPt + hPt
       } else if (rotationAngle === 180) {
-        drawX = xPt + wPt
-        drawY = yPt + hPt
+        drawX = xPt
+        drawY = yPt + 2 * hPt
       } else if (rotationAngle === 270) {
-        drawX = xPt + wPt
-        drawY = yPt
+        drawX = xPt + hPt
+        drawY = yPt + hPt
       }
 
       // Estampar imagen en el lienzo PDF

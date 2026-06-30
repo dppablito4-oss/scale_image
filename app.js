@@ -50,6 +50,7 @@ const transformer = new Konva.Transformer({
     return newBox;
   },
   rotateEnabled: true,
+  keepRatio: true,
   enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
   padding: 5
 });
@@ -324,6 +325,7 @@ function addImageToCanvas(imgObj) {
     });
     
     konvaImg.on('transformend', () => {
+      konvaImg.setAttr('currentFormat', 'custom');
       updateDetailsPanel(konvaImg);
     });
     
@@ -380,6 +382,9 @@ function updateDetailsPanel(node) {
   document.getElementById('detail-x').textContent = `${x} mm`;
   document.getElementById('detail-y').textContent = `${y} mm`;
   document.getElementById('detail-rotation').textContent = `${rotation}°`;
+  
+  const currentFormat = node.getAttr('currentFormat') || 'custom';
+  document.getElementById('detail-format').value = currentFormat;
 }
 
 // Rotación del elemento seleccionado
@@ -391,6 +396,40 @@ document.getElementById('btn-rotate-item').addEventListener('click', () => {
   // Ajustar escala si se rota (opcional, para mantener el aspecto)
   layer.draw();
   updateDetailsPanel(selectedNode);
+});
+
+// Escuchar cambios en el selector de formato
+document.getElementById('detail-format').addEventListener('change', (e) => {
+  if (!selectedNode) return;
+  const newFormat = e.target.value;
+  if (newFormat === 'custom') return;
+  
+  const dimensions = A_SIZES[newFormat];
+  if (!dimensions) return;
+  
+  selectedNode.setAttr('currentFormat', newFormat);
+  
+  // Preservar la orientación original de la imagen
+  const imageObj = selectedNode.image();
+  const imgRatio = imageObj.width / imageObj.height;
+  const formatRatio = dimensions.w / dimensions.h;
+  
+  let targetW = dimensions.w;
+  let targetH = dimensions.h;
+  
+  if ((imgRatio > 1 && formatRatio < 1) || (imgRatio < 1 && formatRatio > 1)) {
+    targetW = dimensions.h;
+    targetH = dimensions.w;
+  }
+  
+  selectedNode.width(targetW);
+  selectedNode.height(targetH);
+  selectedNode.scaleX(1);
+  selectedNode.scaleY(1);
+  
+  layer.draw();
+  updateDetailsPanel(selectedNode);
+  showToast(`Elemento redimensionado al formato ${newFormat}`);
 });
 
 // Eliminar elemento del lienzo
@@ -440,37 +479,45 @@ function applySnapping(activeNode) {
   guideLayer.destroyChildren(); // limpiar guías previas
   
   const box = activeNode.getClientRect();
-  const absX = activeNode.x();
-  const absY = activeNode.y();
+  const currentX = activeNode.x();
+  const currentY = activeNode.y();
   
-  const width = activeNode.width() * activeNode.scaleX();
-  const height = activeNode.height() * activeNode.scaleY();
+  // Diferencia entre la caja delimitadora visual y la posición del pivote del nodo
+  const offsetX = box.x - currentX;
+  const offsetY = box.y - currentY;
   
-  let newX = absX;
-  let newY = absY;
-  
-  let snapX = false;
-  let snapY = false;
+  let newBoxX = box.x;
+  let newBoxY = box.y;
   
   // Bordes del Lienzo A0
-  const canvasTargetsX = [0, CANVAS_MM_W - width, CANVAS_MM_W];
-  const canvasTargetsY = [0, CANVAS_MM_H - height, CANVAS_MM_H];
+  const canvasTargetsX = [0, CANVAS_MM_W - box.width, CANVAS_MM_W];
+  const canvasTargetsY = [0, CANVAS_MM_H - box.height, CANVAS_MM_H];
   
   // Snap a bordes de lienzo X
   for (let target of canvasTargetsX) {
-    if (Math.abs(absX - target) < SNAP_THRESHOLD) {
-      newX = target;
-      snapX = true;
+    if (Math.abs(box.x - target) < SNAP_THRESHOLD) {
+      newBoxX = target;
       drawGuideLine(target, 0, target, CANVAS_MM_H);
+      break;
+    }
+    if (Math.abs(box.x + box.width - target) < SNAP_THRESHOLD) {
+      newBoxX = target - box.width;
+      drawGuideLine(target, 0, target, CANVAS_MM_H);
+      break;
     }
   }
   
   // Snap a bordes de lienzo Y
   for (let target of canvasTargetsY) {
-    if (Math.abs(absY - target) < SNAP_THRESHOLD) {
-      newY = target;
-      snapY = true;
+    if (Math.abs(box.y - target) < SNAP_THRESHOLD) {
+      newBoxY = target;
       drawGuideLine(0, target, CANVAS_MM_W, target);
+      break;
+    }
+    if (Math.abs(box.y + box.height - target) < SNAP_THRESHOLD) {
+      newBoxY = target - box.height;
+      drawGuideLine(0, target, CANVAS_MM_W, target);
+      break;
     }
   }
   
@@ -480,34 +527,36 @@ function applySnapping(activeNode) {
   siblingNodes.forEach(sibling => {
     if (sibling === activeNode) return;
     
-    const sX = sibling.x();
-    const sY = sibling.y();
-    const sW = sibling.width() * sibling.scaleX();
-    const sH = sibling.height() * sibling.scaleY();
+    const sBox = sibling.getClientRect();
     
-    // Alinear X del nodo activo con bordes del hermano
-    const targetsX = [sX, sX + sW, sX - width, sX + sW - width];
+    // Alineaciones en X
+    const targetsX = [sBox.x, sBox.x + sBox.width];
     for (let target of targetsX) {
-      if (Math.abs(absX - target) < SNAP_THRESHOLD) {
-        newX = target;
-        snapX = true;
+      if (Math.abs(box.x - target) < SNAP_THRESHOLD) {
+        newBoxX = target;
+        drawGuideLine(target, 0, target, CANVAS_MM_H);
+      } else if (Math.abs(box.x + box.width - target) < SNAP_THRESHOLD) {
+        newBoxX = target - box.width;
         drawGuideLine(target, 0, target, CANVAS_MM_H);
       }
     }
     
-    // Alinear Y del nodo activo con bordes del hermano
-    const targetsY = [sY, sY + sH, sY - height, sY + sH - height];
+    // Alineaciones en Y
+    const targetsY = [sBox.y, sBox.y + sBox.height];
     for (let target of targetsY) {
-      if (Math.abs(absY - target) < SNAP_THRESHOLD) {
-        newY = target;
-        snapY = true;
+      if (Math.abs(box.y - target) < SNAP_THRESHOLD) {
+        newBoxY = target;
+        drawGuideLine(0, target, CANVAS_MM_W, target);
+      } else if (Math.abs(box.y + box.height - target) < SNAP_THRESHOLD) {
+        newBoxY = target - box.height;
         drawGuideLine(0, target, CANVAS_MM_W, target);
       }
     }
   });
   
-  activeNode.x(newX);
-  activeNode.y(newY);
+  // Asignar nuevas posiciones del pivote del nodo activo
+  activeNode.x(newBoxX - offsetX);
+  activeNode.y(newBoxY - offsetY);
   guideLayer.draw();
 }
 

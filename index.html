@@ -87,6 +87,24 @@
           </div>
         </div>
 
+        <div class="input-field" style="margin-top: 0.25rem;">
+          <label for="detail-format">Formato Objetivo</label>
+          <select id="detail-format" class="select-field">
+            <option value="A0">A0 (841 x 1189 mm)</option>
+            <option value="A1">A1 (594 x 841 mm)</option>
+            <option value="A2">A2 (420 x 594 mm)</option>
+            <option value="A3">A3 (297 x 420 mm)</option>
+            <option value="A4" selected>A4 (210 x 297 mm)</option>
+            <option value="A5">A5 (148 x 210 mm)</option>
+            <option value="A6">A6 (105 x 148 mm)</option>
+            <option value="A7">A7 (74 x 105 mm)</option>
+            <option value="A8">A8 (52 x 74 mm)</option>
+            <option value="A9">A9 (37 x 52 mm)</option>
+            <option value="A10">A10 (26 x 37 mm)</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+
         <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
           <button class="btn-secondary" id="btn-rotate-item" style="flex: 1;">Rotar 90°</button>
           <button class="btn-secondary" id="btn-delete-item" style="flex: 1; border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">Eliminar</button>
