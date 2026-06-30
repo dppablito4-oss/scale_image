@@ -301,6 +301,8 @@ function renderActiveImageSpiral() {
         height: slot.h,
         rotation: slot.rotation,
         draggable: false, // Deshabilitar arrastre
+        stroke: '#b5b5b5', // Borde gris claro para guiar el corte (útil para PNGs transparentes)
+        strokeWidth: 0.5,
         name: 'impose-item'
       });
       
@@ -388,11 +390,6 @@ formatsList.forEach(f => {
 
 // --- Compilar y Solicitar PDF ---
 document.getElementById('btn-generate-pdf').addEventListener('click', async () => {
-  if (!edgeFunctionUrl) {
-    showToast('Debe configurar la URL de la Edge Function.', true);
-    return;
-  }
-  
   const items = stage.find('.impose-item');
   if (items.length === 0) return;
   
@@ -401,39 +398,77 @@ document.getElementById('btn-generate-pdf').addEventListener('click', async () =
   btn.disabled = true;
   btn.innerHTML = 'Compilando PDF...';
   
-  const payload = {
-    job_id: `job_${Date.now()}`,
-    canvas_width_mm: CANVAS_MM_W,
-    canvas_height_mm: CANVAS_MM_H,
-    items: items.map(item => {
-      return {
-        storage_path: item.getAttr('storagePath'),
-        format_target: item.getAttr('currentFormat') || 'A4',
-        x_mm: Math.round(item.x()),
-        y_mm: Math.round(item.y()),
-        width_mm: Math.round(item.width() * item.scaleX()),
-        height_mm: Math.round(item.height() * item.scaleY()),
-        rotation_deg: Math.round(item.rotation() % 360)
-      };
-    })
-  };
-  
   try {
-    const response = await fetch(edgeFunctionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify(payload)
-    });
+    const MM_TO_PT = 2.83464567;
+    const CANVAS_H_PT = 1189 * MM_TO_PT; // 3370.4 pt
     
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(errText || `Error ${response.status}`);
+    // Crear PDF en blanco tamaño A0
+    const pdfDoc = await PDFLib.PDFDocument.create();
+    const page = pdfDoc.addPage([841 * MM_TO_PT, CANVAS_H_PT]);
+    
+    // Obtener los bytes de la imagen activa
+    const response = await fetch(activeImage.localUrl);
+    const imageBytes = await response.arrayBuffer();
+    
+    // Incrustar la imagen según el formato
+    const isPng = activeImage.name.toLowerCase().endsWith('.png');
+    const embeddedImg = isPng 
+      ? await pdfDoc.embedPng(imageBytes) 
+      : await pdfDoc.embedJpg(imageBytes);
+      
+    // Dibujar cada elemento de imposición
+    for (const item of items) {
+      const format = item.getAttr('currentFormat');
+      const slot = spiralSlots.find(s => s.format === format);
+      if (!slot) continue;
+      
+      const wPt = slot.w * MM_TO_PT;
+      const hPt = slot.h * MM_TO_PT;
+      const xPt = slot.x * MM_TO_PT;
+      
+      // Inversión del eje Y (Web arriba-izquierda a PDF abajo-izquierda)
+      const yPt = CANVAS_H_PT - (slot.y * MM_TO_PT) - hPt;
+      
+      let drawX = xPt;
+      let drawY = yPt;
+      const rotationAngle = slot.rotation;
+      
+      // Aplicar el pivote correcto según el ángulo de rotación
+      if (rotationAngle === 90) {
+        drawX = xPt - hPt;
+        drawY = yPt + hPt;
+      } else if (rotationAngle === 180) {
+        drawX = xPt;
+        drawY = yPt + 2 * hPt;
+      } else if (rotationAngle === 270) {
+        drawX = xPt + hPt;
+        drawY = yPt + hPt;
+      }
+      
+      // Estampar la imagen en el PDF
+      page.drawImage(embeddedImg, {
+        x: drawX,
+        y: drawY,
+        width: wPt,
+        height: hPt,
+        rotate: PDFLib.degrees(-rotationAngle)
+      });
+      
+      // Dibujar un borde delgado gris alrededor de la imagen (guía de corte)
+      page.drawRectangle({
+        x: drawX,
+        y: drawY,
+        width: wPt,
+        height: hPt,
+        borderColor: PDFLib.rgb(0.7, 0.7, 0.7), // Gris claro
+        borderWidth: 0.5,
+        rotate: PDFLib.degrees(-rotationAngle)
+      });
     }
     
-    const blob = await response.blob();
+    // Guardar e iniciar descarga
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const downloadUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = downloadUrl;
@@ -442,7 +477,7 @@ document.getElementById('btn-generate-pdf').addEventListener('click', async () =
     a.click();
     document.body.removeChild(a);
     
-    showToast('¡PDF de Imposición generado con éxito!');
+    showToast('¡PDF de Imposición generado con éxito localmente!');
   } catch (err) {
     console.error(err);
     showToast(`Error al compilar PDF: ${err.message}`, true);
