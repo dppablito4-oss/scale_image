@@ -39,53 +39,72 @@
         </div>
       </div>
 
-      <!-- Detalles del Elemento Seleccionado en Canvas -->
-      <div class="selected-details" id="details-panel" style="display: none;">
-        <h2 class="section-title">Elemento Seleccionado</h2>
-        <div class="dimension-badge-grid">
-          <div class="dimension-badge">
-            <span class="dimension-label">Ancho</span>
-            <span class="dimension-value" id="detail-width">0 mm</span>
+      <!-- Panel de Distribución Automática (Serie A) -->
+      <div class="selected-details" id="auto-layout-panel">
+        <h2 class="section-title">Distribución Espiral (A1 - A10)</h2>
+        
+        <!-- Estado de Imagen Activa -->
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.75rem;">
+          <div style="width: 40px; height: 40px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; overflow: hidden;" id="active-thumb-container">
+            <span style="font-size: 1.25rem; color: var(--text-muted);">📷</span>
           </div>
-          <div class="dimension-badge">
-            <span class="dimension-label">Alto</span>
-            <span class="dimension-value" id="detail-height">0 mm</span>
-          </div>
-          <div class="dimension-badge">
-            <span class="dimension-label">Posición X</span>
-            <span class="dimension-value" id="detail-x">0 mm</span>
-          </div>
-          <div class="dimension-badge">
-            <span class="dimension-label">Posición Y</span>
-            <span class="dimension-value" id="detail-y">0 mm</span>
-          </div>
-          <div class="dimension-badge" style="grid-column: span 2;">
-            <span class="dimension-label">Rotación</span>
-            <span class="dimension-value" id="detail-rotation">0°</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Imagen Activa</div>
+            <div style="font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);" id="active-img-name">Ninguna seleccionada</div>
           </div>
         </div>
 
+        <!-- Selector de límite de la serie -->
         <div class="input-field" style="margin-top: 0.25rem;">
-          <label for="detail-format">Formato Objetivo</label>
-          <select id="detail-format" class="select-field">
-            <option value="A0">A0 (841 x 1189 mm)</option>
-            <option value="A1">A1 (594 x 841 mm)</option>
-            <option value="A2">A2 (420 x 594 mm)</option>
-            <option value="A3">A3 (297 x 420 mm)</option>
-            <option value="A4" selected>A4 (210 x 297 mm)</option>
-            <option value="A5">A5 (148 x 210 mm)</option>
-            <option value="A6">A6 (105 x 148 mm)</option>
-            <option value="A7">A7 (74 x 105 mm)</option>
-            <option value="A8">A8 (52 x 74 mm)</option>
-            <option value="A9">A9 (37 x 52 mm)</option>
-            <option value="A10">A10 (26 x 37 mm)</option>
+          <label for="layout-limit-select">Límite de la Serie A</label>
+          <select id="layout-limit-select" class="select-field">
+            <option value="none">Ninguno (Lienzo vacío)</option>
+            <option value="A1">Hasta A1 (1 imagen)</option>
+            <option value="A2">Hasta A2 (2 imágenes)</option>
+            <option value="A3">Hasta A3 (3 imágenes)</option>
+            <option value="A4" selected>Hasta A4 (4 imágenes)</option>
+            <option value="A5">Hasta A5 (5 imágenes)</option>
+            <option value="A6">Hasta A6 (6 imágenes)</option>
+            <option value="A7">Hasta A7 (7 imágenes)</option>
+            <option value="A8">Hasta A8 (8 imágenes)</option>
+            <option value="A9">Hasta A9 (9 imágenes)</option>
+            <option value="A10">Hasta A10 (10 imágenes)</option>
             <option value="custom">Personalizado</option>
           </select>
         </div>
 
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-          <button class="btn-secondary" id="btn-rotate-item" style="flex: 1;">Rotar 90°</button>
-          <button class="btn-secondary" id="btn-delete-item" style="flex: 1; border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">Eliminar</button>
+        <!-- Checkboxes individuales -->
+        <div class="checkbox-grid" style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: 8px;">
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A1" checked> <label for="chk-A1">A1</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A2" checked> <label for="chk-A2">A2</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A3" checked> <label for="chk-A3">A3</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A4" checked> <label for="chk-A4">A4</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A5"> <label for="chk-A5">A5</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A6"> <label for="chk-A6">A6</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A7"> <label for="chk-A7">A7</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A8"> <label for="chk-A8">A8</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A9"> <label for="chk-A9">A9</label>
+          </div>
+          <div class="checkbox-item" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <input type="checkbox" id="chk-A10"> <label for="chk-A10">A10</label>
+          </div>
         </div>
       </div>
 

@@ -198,7 +198,8 @@ async function handleFiles(files) {
         
         // Configurar evento de añadir al lienzo
         itemEl.querySelector('.add-to-canvas-btn').addEventListener('click', () => {
-          addImageToCanvas(newImgObject);
+          activeImage = newImgObject;
+          renderActiveImageSpiral();
         });
         
         showToast(`Imagen subida: ${file.name}`);
@@ -232,7 +233,8 @@ async function handleFiles(files) {
       galleryImages.push(newImgObject);
       
       itemContainer.querySelector(`#${imageItemId} .add-to-canvas-btn`).addEventListener('click', () => {
-        addImageToCanvas(newImgObject);
+        activeImage = newImgObject;
+        renderActiveImageSpiral();
       });
       
       showToast(`Imagen lista localmente: ${file.name}`);
@@ -241,186 +243,99 @@ async function handleFiles(files) {
   }
 }
 
-// --- Gestión de Canvas / Elementos de Imposición ---
+// --- Gestión de Canvas / Elementos de Imposición (Distribución Automática) ---
 
-function addImageToCanvas(imgObj) {
+let activeImage = null; // Guardará el objeto de imagen activo { name, storagePath, localUrl }
+
+const spiralSlots = [
+  { format: 'A1', x: 841, y: 0, w: 594, h: 841, rotation: 90 },
+  { format: 'A2', x: 0, y: 594, w: 420, h: 594, rotation: 0 },
+  { format: 'A3', x: 840, y: 594, w: 297, h: 420, rotation: 90 },
+  { format: 'A4', x: 420, y: 891, w: 210, h: 297, rotation: 0 },
+  { format: 'A5', x: 840, y: 891, w: 148, h: 210, rotation: 90 },
+  { format: 'A6', x: 630, y: 1039, w: 105, h: 148, rotation: 0 },
+  { format: 'A7', x: 840, y: 1039, w: 74, h: 105, rotation: 90 },
+  { format: 'A8', x: 735, y: 1113, w: 52, h: 74, rotation: 0 },
+  { format: 'A9', x: 839, y: 1113, w: 37, h: 52, rotation: 90 },
+  { format: 'A10', x: 787, y: 1150, w: 26, h: 37, rotation: 0 }
+];
+
+function updateActiveImageUI(imgObj) {
+  if (imgObj) {
+    document.getElementById('active-thumb-container').innerHTML = `<img src="${imgObj.localUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    document.getElementById('active-img-name').textContent = imgObj.name;
+  } else {
+    document.getElementById('active-thumb-container').innerHTML = '<span style="font-size: 1.25rem; color: var(--text-muted);">📷</span>';
+    document.getElementById('active-img-name').textContent = 'Ninguna seleccionada';
+  }
+}
+
+function renderActiveImageSpiral() {
+  // Limpiar lienzo primero
+  const items = stage.find('.impose-item');
+  items.forEach(item => item.destroy());
+  
+  updateActiveImageUI(activeImage);
+  
+  if (!activeImage) {
+    layer.draw();
+    updateGenerateButtonState();
+    updateCanvasStatusText();
+    return;
+  }
+  
   const imageObj = new Image();
-  imageObj.src = imgObj.localUrl;
+  imageObj.src = activeImage.localUrl;
   
   imageObj.onload = () => {
-    // Determinar tamaño inicial predeterminado (por ejemplo, A4)
-    const defaultFormat = 'A4';
-    const dimensions = A_SIZES[defaultFormat];
-    
-    // Proporciones de la imagen cargada
-    const imgRatio = imageObj.width / imageObj.height;
-    const formatRatio = dimensions.w / dimensions.h;
-    
-    let targetW = dimensions.w;
-    let targetH = dimensions.h;
-    
-    // Adaptar orientación de la imagen
-    if ((imgRatio > 1 && formatRatio < 1) || (imgRatio < 1 && formatRatio > 1)) {
-      // Invertir ancho/alto si las orientaciones no coinciden
-      targetW = dimensions.h;
-      targetH = dimensions.w;
-    }
-    
-    const konvaImg = new Konva.Image({
-      image: imageObj,
-      x: 20,
-      y: 20,
-      width: targetW,
-      height: targetH,
-      draggable: true,
-      name: 'impose-item'
+    spiralSlots.forEach(slot => {
+      // Verificar si el checkbox para este formato está activo
+      const isChecked = document.getElementById(`chk-${slot.format}`).checked;
+      if (!isChecked) return;
+      
+      const konvaImg = new Konva.Image({
+        image: imageObj,
+        x: slot.x,
+        y: slot.y,
+        width: slot.w,
+        height: slot.h,
+        rotation: slot.rotation,
+        draggable: false, // Deshabilitar arrastre
+        name: 'impose-item'
+      });
+      
+      konvaImg.setAttr('storagePath', activeImage.storagePath);
+      konvaImg.setAttr('originalName', activeImage.name);
+      konvaImg.setAttr('currentFormat', slot.format);
+      
+      layer.add(konvaImg);
     });
     
-    // Guardar ruta de supabase en metadatos del nodo
-    konvaImg.setAttr('storagePath', imgObj.storagePath);
-    konvaImg.setAttr('originalName', imgObj.name);
-    konvaImg.setAttr('currentFormat', defaultFormat);
-    
-    // Eventos del elemento
-    konvaImg.on('dragmove', () => {
-      applySnapping(konvaImg);
-      updateDetailsPanel(konvaImg);
-    });
-    
-    konvaImg.on('transform', () => {
-      // Evitar distorsión descontrolada
-      updateDetailsPanel(konvaImg);
-    });
-    
-    konvaImg.on('transformend', () => {
-      konvaImg.setAttr('currentFormat', 'custom');
-      updateDetailsPanel(konvaImg);
-    });
-    
-    // Evento de click/tap para seleccionar
-    konvaImg.on('mousedown touchstart', (e) => {
-      selectNode(konvaImg);
-      e.cancelBubble = true;
-    });
-    
-    layer.add(konvaImg);
-    selectNode(konvaImg);
     layer.draw();
-    
-    showToast(`Elemento agregado al lienzo como ${defaultFormat}`);
     updateGenerateButtonState();
     updateCanvasStatusText();
   };
 }
 
-// --- Selección de Elementos ---
+// --- Selección de Elementos (Desactivada para automático) ---
 function selectNode(node) {
-  selectedNode = node;
-  if (node) {
-    transformer.nodes([node]);
-    updateDetailsPanel(node);
-    document.getElementById('details-panel').style.display = 'block';
-  } else {
-    transformer.nodes([]);
-    document.getElementById('details-panel').style.display = 'none';
-  }
+  selectedNode = null;
+  transformer.nodes([]);
   layer.draw();
 }
-
-// Deseleccionar al hacer click en el lienzo vacío
-stage.on('mousedown touchstart', (e) => {
-  if (e.target === stage) {
-    selectNode(null);
-  }
-});
-
-// Actualizar panel de detalles
-function updateDetailsPanel(node) {
-  if (!node) return;
-  
-  // Calcular dimensiones visuales con escala aplicada por el transformador
-  const w = Math.round(node.width() * node.scaleX());
-  const h = Math.round(node.height() * node.scaleY());
-  const x = Math.round(node.x());
-  const y = Math.round(node.y());
-  const rotation = Math.round(node.rotation() % 360);
-  
-  document.getElementById('detail-width').textContent = `${w} mm`;
-  document.getElementById('detail-height').textContent = `${h} mm`;
-  document.getElementById('detail-x').textContent = `${x} mm`;
-  document.getElementById('detail-y').textContent = `${y} mm`;
-  document.getElementById('detail-rotation').textContent = `${rotation}°`;
-  
-  const currentFormat = node.getAttr('currentFormat') || 'custom';
-  document.getElementById('detail-format').value = currentFormat;
-}
-
-// Rotación del elemento seleccionado
-document.getElementById('btn-rotate-item').addEventListener('click', () => {
-  if (!selectedNode) return;
-  const currentRot = selectedNode.rotation();
-  selectedNode.rotation((currentRot + 90) % 360);
-  
-  // Ajustar escala si se rota (opcional, para mantener el aspecto)
-  layer.draw();
-  updateDetailsPanel(selectedNode);
-});
-
-// Escuchar cambios en el selector de formato
-document.getElementById('detail-format').addEventListener('change', (e) => {
-  if (!selectedNode) return;
-  const newFormat = e.target.value;
-  if (newFormat === 'custom') return;
-  
-  const dimensions = A_SIZES[newFormat];
-  if (!dimensions) return;
-  
-  selectedNode.setAttr('currentFormat', newFormat);
-  
-  // Preservar la orientación original de la imagen
-  const imageObj = selectedNode.image();
-  const imgRatio = imageObj.width / imageObj.height;
-  const formatRatio = dimensions.w / dimensions.h;
-  
-  let targetW = dimensions.w;
-  let targetH = dimensions.h;
-  
-  if ((imgRatio > 1 && formatRatio < 1) || (imgRatio < 1 && formatRatio > 1)) {
-    targetW = dimensions.h;
-    targetH = dimensions.w;
-  }
-  
-  selectedNode.width(targetW);
-  selectedNode.height(targetH);
-  selectedNode.scaleX(1);
-  selectedNode.scaleY(1);
-  
-  layer.draw();
-  updateDetailsPanel(selectedNode);
-  showToast(`Elemento redimensionado al formato ${newFormat}`);
-});
-
-// Eliminar elemento del lienzo
-document.getElementById('btn-delete-item').addEventListener('click', () => {
-  if (!selectedNode) return;
-  const name = selectedNode.getAttr('originalName');
-  selectedNode.destroy();
-  selectNode(null);
-  layer.draw();
-  showToast(`Eliminado del lienzo: ${name}`);
-  updateGenerateButtonState();
-  updateCanvasStatusText();
-});
 
 // Limpiar todo el lienzo
 document.getElementById('btn-clear-canvas').addEventListener('click', () => {
-  const items = stage.find('.impose-item');
-  items.forEach(item => item.destroy());
-  selectNode(null);
-  layer.draw();
+  activeImage = null;
+  document.getElementById('layout-limit-select').value = 'none';
+  
+  const formats = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'];
+  formats.forEach(f => {
+    document.getElementById(`chk-${f}`).checked = false;
+  });
+  
+  renderActiveImageSpiral();
   showToast('Lienzo limpiado.');
-  updateGenerateButtonState();
-  updateCanvasStatusText();
 });
 
 function updateCanvasStatusText() {
@@ -440,114 +355,41 @@ function updateGenerateButtonState() {
   document.getElementById('btn-generate-pdf').disabled = (items.length === 0);
 }
 
-// --- Snapping Magnético (Guías inteligentes) ---
-const SNAP_THRESHOLD = 8; // distancia de atracción en mm
+// --- Configuración de los Controles Automáticos del Sidebar ---
 
-function applySnapping(activeNode) {
-  guideLayer.destroyChildren(); // limpiar guías previas
+// Escuchar cambios en el selector de rango de formatos
+document.getElementById('layout-limit-select').addEventListener('change', (e) => {
+  const limit = e.target.value;
+  const formats = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'];
   
-  const box = activeNode.getClientRect();
-  const currentX = activeNode.x();
-  const currentY = activeNode.y();
-  
-  // Diferencia entre la caja delimitadora visual y la posición del pivote del nodo
-  const offsetX = box.x - currentX;
-  const offsetY = box.y - currentY;
-  
-  let newBoxX = box.x;
-  let newBoxY = box.y;
-  
-  // Bordes del Lienzo A0
-  const canvasTargetsX = [0, CANVAS_MM_W - box.width, CANVAS_MM_W];
-  const canvasTargetsY = [0, CANVAS_MM_H - box.height, CANVAS_MM_H];
-  
-  // Snap a bordes de lienzo X
-  for (let target of canvasTargetsX) {
-    if (Math.abs(box.x - target) < SNAP_THRESHOLD) {
-      newBoxX = target;
-      drawGuideLine(target, 0, target, CANVAS_MM_H);
-      break;
-    }
-    if (Math.abs(box.x + box.width - target) < SNAP_THRESHOLD) {
-      newBoxX = target - box.width;
-      drawGuideLine(target, 0, target, CANVAS_MM_H);
-      break;
-    }
+  if (limit === 'none') {
+    formats.forEach(f => {
+      document.getElementById(`chk-${f}`).checked = false;
+    });
+  } else if (limit !== 'custom') {
+    const limitIndex = formats.indexOf(limit);
+    formats.forEach((f, index) => {
+      document.getElementById(`chk-${f}`).checked = (index <= limitIndex);
+    });
   }
   
-  // Snap a bordes de lienzo Y
-  for (let target of canvasTargetsY) {
-    if (Math.abs(box.y - target) < SNAP_THRESHOLD) {
-      newBoxY = target;
-      drawGuideLine(0, target, CANVAS_MM_W, target);
-      break;
-    }
-    if (Math.abs(box.y + box.height - target) < SNAP_THRESHOLD) {
-      newBoxY = target - box.height;
-      drawGuideLine(0, target, CANVAS_MM_W, target);
-      break;
-    }
-  }
-  
-  // Snap a otros elementos en el lienzo
-  const siblingNodes = stage.find('.impose-item');
-  
-  siblingNodes.forEach(sibling => {
-    if (sibling === activeNode) return;
-    
-    const sBox = sibling.getClientRect();
-    
-    // Alineaciones en X
-    const targetsX = [sBox.x, sBox.x + sBox.width];
-    for (let target of targetsX) {
-      if (Math.abs(box.x - target) < SNAP_THRESHOLD) {
-        newBoxX = target;
-        drawGuideLine(target, 0, target, CANVAS_MM_H);
-      } else if (Math.abs(box.x + box.width - target) < SNAP_THRESHOLD) {
-        newBoxX = target - box.width;
-        drawGuideLine(target, 0, target, CANVAS_MM_H);
-      }
-    }
-    
-    // Alineaciones en Y
-    const targetsY = [sBox.y, sBox.y + sBox.height];
-    for (let target of targetsY) {
-      if (Math.abs(box.y - target) < SNAP_THRESHOLD) {
-        newBoxY = target;
-        drawGuideLine(0, target, CANVAS_MM_W, target);
-      } else if (Math.abs(box.y + box.height - target) < SNAP_THRESHOLD) {
-        newBoxY = target - box.height;
-        drawGuideLine(0, target, CANVAS_MM_W, target);
-      }
-    }
-  });
-  
-  // Asignar nuevas posiciones del pivote del nodo activo
-  activeNode.x(newBoxX - offsetX);
-  activeNode.y(newBoxY - offsetY);
-  guideLayer.draw();
-}
+  renderActiveImageSpiral();
+});
 
-function drawGuideLine(x1, y1, x2, y2) {
-  const line = new Konva.Line({
-    points: [x1, y1, x2, y2],
-    stroke: 'var(--accent)',
-    strokeWidth: 1.5,
-    dash: [4, 4]
+// Escuchar cambios en los checkboxes individuales
+const formatsList = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'];
+formatsList.forEach(f => {
+  document.getElementById(`chk-${f}`).addEventListener('change', () => {
+    // Si marcan/desmarcan algo manual, el selector pasa a 'Personalizado'
+    document.getElementById('layout-limit-select').value = 'custom';
+    renderActiveImageSpiral();
   });
-  guideLayer.add(line);
-}
-
-// Limpiar guías al soltar el elemento
-stage.on('dragend', () => {
-  guideLayer.destroyChildren();
-  guideLayer.draw();
 });
 
 // --- Compilar y Solicitar PDF ---
 document.getElementById('btn-generate-pdf').addEventListener('click', async () => {
   if (!edgeFunctionUrl) {
-    showToast('Debe configurar la URL de la Edge Function en la barra lateral.', true);
+    showToast('Debe configurar la URL de la Edge Function.', true);
     return;
   }
   
@@ -559,7 +401,6 @@ document.getElementById('btn-generate-pdf').addEventListener('click', async () =
   btn.disabled = true;
   btn.innerHTML = 'Compilando PDF...';
   
-  // Construir el payload JSON de acuerdo con el contrato de la Edge Function
   const payload = {
     job_id: `job_${Date.now()}`,
     canvas_width_mm: CANVAS_MM_W,
@@ -592,7 +433,6 @@ document.getElementById('btn-generate-pdf').addEventListener('click', async () =
       throw new Error(errText || `Error ${response.status}`);
     }
     
-    // Descargar el archivo PDF devuelto
     const blob = await response.blob();
     const downloadUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
