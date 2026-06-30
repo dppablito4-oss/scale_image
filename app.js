@@ -17,10 +17,10 @@ const CANVAS_MM_W = 841; // A0 Ancho
 const CANVAS_MM_H = 1189; // A0 Alto
 
 // --- Configuración y Estado ---
-let supabaseUrl = '';
-let supabaseKey = '';
-let bucketName = 'imagenes-impresion';
-let edgeFunctionUrl = '';
+const supabaseUrl = 'https://koptglmifwpzrfzvipnm.supabase.co';
+const supabaseKey = 'sb_publishable_erAiat0Q6VFXk5gveRnj4A_3WKFzBzI';
+const bucketName = 'imagenes-impresion';
+const edgeFunctionUrl = 'https://koptglmifwpzrfzvipnm.supabase.co/functions/v1/scale-image';
 
 let galleryImages = []; // { name, path, localUrl }
 let selectedNode = null;
@@ -56,44 +56,12 @@ const transformer = new Konva.Transformer({
 });
 layer.add(transformer);
 
-// --- Cargar Configuración de LocalStorage ---
+// --- Inicialización al Cargar la Página ---
 window.addEventListener('DOMContentLoaded', () => {
-  const sbUrl = localStorage.getItem('scale_sb_url');
-  const sbKey = localStorage.getItem('scale_sb_key');
-  const sbBucket = localStorage.getItem('scale_sb_bucket');
-  const sbEdge = localStorage.getItem('scale_edge_url');
-  
-  if (sbUrl !== null) document.getElementById('supabase-url').value = sbUrl;
-  if (sbKey !== null) document.getElementById('supabase-key').value = sbKey;
-  if (sbBucket !== null) document.getElementById('supabase-bucket').value = sbBucket;
-  if (sbEdge !== null) document.getElementById('edge-function-url').value = sbEdge;
-  
-  updateConfigFromInputs();
   resizeViewport();
-  
-  // Guardar configuración al cambiar
-  const inputs = ['supabase-url', 'supabase-key', 'supabase-bucket', 'edge-function-url'];
-  inputs.forEach(id => {
-    document.getElementById(id).addEventListener('change', () => {
-      updateConfigFromInputs();
-      showToast('Configuración guardada en caché local.');
-    });
-  });
 });
 
 window.addEventListener('resize', resizeViewport);
-
-function updateConfigFromInputs() {
-  supabaseUrl = document.getElementById('supabase-url').value.trim();
-  supabaseKey = document.getElementById('supabase-key').value.trim();
-  bucketName = document.getElementById('supabase-bucket').value.trim();
-  edgeFunctionUrl = document.getElementById('edge-function-url').value.trim();
-  
-  localStorage.setItem('scale_sb_url', supabaseUrl);
-  localStorage.setItem('scale_sb_key', supabaseKey);
-  localStorage.setItem('scale_sb_bucket', bucketName);
-  localStorage.setItem('scale_edge_url', edgeFunctionUrl);
-}
 
 // Ajustar escala visual del contenedor del lienzo
 function resizeViewport() {
